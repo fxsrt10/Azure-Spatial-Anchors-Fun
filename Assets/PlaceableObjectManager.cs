@@ -1,6 +1,7 @@
 using Microsoft.Azure.SpatialAnchors;
 using Microsoft.Azure.SpatialAnchors.Unity;
 using Newtonsoft.Json;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.IO;
@@ -29,6 +30,8 @@ public class PlaceableObjectManager : MonoBehaviour
         anchorLocateCriteria = new AnchorLocateCriteria();
         anchorList = new List<Anchors>();
         anchorsGOList = new List<AnchorModuleScript>();
+        Invoke("StartAzureSession", 2.0f);
+        //StartAzureSession();
     }
 
     // Update is called once per frame
@@ -58,37 +61,27 @@ public class PlaceableObjectManager : MonoBehaviour
         anchor.placedobjects = new List<PlacedObjects>();
         anchor.placedobjects = currentAnchor.childObjects.Values.ToList();
         Debug.Log("and added new anchor");
-        anchorList.Add(anchor);
     }
 
     public void UpdateAnchor(string anchorID, AnchorModuleScript anchorGO)
     {
         Debug.Log($"{anchorID} is being updated");
-        //if (anchorList == null)
-        //{
-        //    Debug.Log("Created anchorList for some reason");
-        //    anchorList = new List<Anchors>();
-        //    Anchors anchor = new Anchors();
 
-
-        //    anchor.cloudAnchorID = anchorID;
-        //    anchor.placedobjects = new List<PlacedObjects>();
-        //    anchorList.Add(anchor);
-        //    Debug.Log(anchorList.ToString());
-        //}
+#if UNITY_EDITOR
+        if (String.IsNullOrEmpty(anchorID))
+        {
+            if (String.IsNullOrEmpty(anchorID)) {
+                anchorID = "123-editor-anchor-id";
+            }
+        }
+#endif
         Anchors result = new Anchors();
         result.cloudAnchorID = anchorID;
-        Debug.Log($"{anchorID} is being written to temp anchor");
         result.placedobjects = anchorGO.childObjects.Values.ToList();
         Debug.Log($"{anchorID} has placed objects written");
-        if(anchorList.Count == 0)
-        {
-            anchorList.Add(result);
-        }
-        else
-        {
-            anchorList[0] = result;
-        }
+        anchorList = new List<Anchors>();
+        Debug.Log(anchorList.Count);
+        anchorList.Add(result);
     }
 
     public void CreateNewPlaceableObject()
@@ -245,87 +238,12 @@ public class PlaceableObjectManager : MonoBehaviour
             anchorsGOList.Add(currentAnchor);
             currentAnchor.Setup();
             currentAnchor.SpawnChildObjects(anchorList[0].placedobjects, placeableObjectPrefab, anchorList[0].cloudAnchorID);
-            //currentAnchor.
         }
 #if !UNITY_EDITOR
         currentAnchor.FindAzureAnchor(anchorList[0].cloudAnchorID);
 #endif
 
     }
-
-    //    private void CloudManager_AnchorLocated(object sender, AnchorLocatedEventArgs args)
-    //    {
-    //        QueueOnUpdate(new Action(() => Debug.Log($"Anchor recognized as a possible Azure anchor")));
-
-    //        if (args.Status == LocateAnchorStatus.Located || args.Status == LocateAnchorStatus.AlreadyTracked)
-    //        {
-    //            currentCloudAnchor = args.Anchor;
-
-    //            QueueOnUpdate(() =>
-    //            {
-    //                Debug.Log($"Azure anchor located successfully");
-
-    //                // Notify AnchorFeedbackScript
-    //                OnASAAnchorLocated?.Invoke();
-
-    //#if WINDOWS_UWP || UNITY_WSA
-    //                // HoloLens: The position will be set based on the unityARUserAnchor that was located.
-
-    //                // Create a local anchor at the location of the object in question
-    //                gameObject.CreateNativeAnchor();
-
-    //                // Notify AnchorFeedbackScript
-    //                OnCreateLocalAnchor?.Invoke();
-
-    //                // On HoloLens, if we do not have a cloudAnchor already, we will have already positioned the
-    //                // object based on the passed in worldPos/worldRot and attached a new world anchor,
-    //                // so we are ready to commit the anchor to the cloud if requested.
-    //                // If we do have a cloudAnchor, we will use it's pointer to setup the world anchor,
-    //                // which will position the object automatically.
-    //                if (currentCloudAnchor != null)
-    //                {
-    //                    Debug.Log("Local anchor position successfully set to Azure anchor position");
-
-    //                    //gameObject.GetComponent<UnityEngine.XR.WSA.WorldAnchor>().SetNativeSpatialAnchorPtr(currentCloudAnchor.LocalAnchor);
-
-    //                    Pose anchorPose = Pose.identity;
-    //                    anchorPose = currentCloudAnchor.GetPose();
-
-    //                    Debug.Log($"Setting object to anchor pose with position '{anchorPose.position}' and rotation '{anchorPose.rotation}'");
-    //                    transform.position = anchorPose.position;
-    //                    transform.rotation = anchorPose.rotation;
-
-    //                    removeAnchor = "Inactive";
-    //                    // Create a native anchor at the location of the object in question
-    //                    gameObject.CreateNativeAnchor();
-
-    //                    // Notify AnchorFeedbackScript
-    //                    OnCreateLocalAnchor?.Invoke();
-    //                }
-
-    //#elif UNITY_ANDROID || UNITY_IOS
-    //                Pose anchorPose = Pose.identity;
-    //                anchorPose = currentCloudAnchor.GetPose();
-
-    //                Debug.Log($"Setting object to anchor pose with position '{anchorPose.position}' and rotation '{anchorPose.rotation}'");
-    //                transform.position = anchorPose.position;
-    //                transform.rotation = anchorPose.rotation;
-
-    //                // Create a native anchor at the location of the object in question
-    //                gameObject.CreateNativeAnchor();
-
-    //                // Notify AnchorFeedbackScript
-    //                OnCreateLocalAnchor?.Invoke();
-
-    //#endif
-    //            });
-    //        }
-    //        else
-    //        {
-    //            QueueOnUpdate(new Action(() => Debug.Log($"Attempt to locate Anchor with ID '{args.Identifier}' failed, locate anchor status was not 'Located' but '{args.Status}'")));
-    //        }
-    //    }
-    //#endregion
 
 
 

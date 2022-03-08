@@ -72,8 +72,8 @@ public class AnchorModuleScript : MonoBehaviour
 
     public void UpdateObject(PlaceableObject placeableObject)
     {
-        childObjects[placeableObject.id].position = placeableObject.transform.position.ToString();
-        childObjects[placeableObject.id].rotation = placeableObject.transform.rotation.eulerAngles.ToString();
+        childObjects[placeableObject.id].position = placeableObject.transform.position.ToString("F8");
+        childObjects[placeableObject.id].rotation = placeableObject.transform.rotation.eulerAngles.ToString("F8");
         if (String.IsNullOrEmpty(placeableObject.information))
         {
             childObjects[placeableObject.id].information = "Untitled";
@@ -139,10 +139,6 @@ public class AnchorModuleScript : MonoBehaviour
 
     void OnDestroy()
     {
-        //if (cloudManager != null && cloudManager.Session != null)
-        //{
-        //    cloudManager.DestroySession();
-        //}
 
         if (currentWatcher != null)
         {

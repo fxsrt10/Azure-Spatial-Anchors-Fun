@@ -67,6 +67,10 @@ public class PlaceableObject : MonoBehaviour
     public void Delete()
     {
         parentCloudAnchor.childObjects.Remove(this.id);
-        Destroy(this);
+        parentCloudAnchor.placeableObjectManager.UpdateAnchor(parentCloudAnchor.currentAzureAnchorID, parentCloudAnchor);
+        Debug.Log("Deleteing" + this.id);
+        Debug.Log(parentCloudAnchor.childObjects.Count);
+        Destroy(gameObject);
+
     }
 }
