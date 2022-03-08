@@ -7,6 +7,10 @@ using System.IO;
 using System.Linq;
 using UnityEngine;
 
+#if WINDOWS_UWP
+using Windows.Storage;
+#endif
+
 public class PlaceableObjectManager : MonoBehaviour
 {
     public GameObject anchorPrefab;
