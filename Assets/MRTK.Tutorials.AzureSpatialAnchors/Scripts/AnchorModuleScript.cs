@@ -12,21 +12,41 @@ using Microsoft.Azure.SpatialAnchors.Unity;
 using Windows.Storage;
 #endif
 
+public class Anchors
+{
+    public string cloudAnchorID { get; set; }
+    public List<PlacedObjects> placedobjects { get; set; }
+
+    public Anchors()
+    {
+        cloudAnchorID = "";
+        placedobjects = new List<PlacedObjects>();
+    }
+    public override string ToString()
+    {
+        string easyList = JsonUtility.ToJson(placedobjects);
+        return base.ToString() + ": " + cloudAnchorID.ToString() + easyList;
+    }
+}
 public class AnchorModuleScript : MonoBehaviour
 {
     [SerializeField]
     [Tooltip("The unique identifier used to identify the shared file (containing the Azure anchor ID) on the web server.")]
     private string publicSharingPin = "1982734901747";
 
-    [HideInInspector]
     // Anchor ID for anchor stored in Azure (provided by Azure) 
     public string currentAzureAnchorID = "";
-    public string removeAnchor = "Inactive";
 
-    private SpatialAnchorManager cloudManager;
-    private CloudSpatialAnchor currentCloudAnchor;
+    public string removeAnchor = "Inactive";
+    public Dictionary<string, PlacedObjects> childObjects;
+
+    public SpatialAnchorManager cloudManager;
+    public PlaceableObjectManager placeableObjectManager;
+    public CloudSpatialAnchor currentCloudAnchor;
     private AnchorLocateCriteria anchorLocateCriteria;
     private CloudSpatialAnchorWatcher currentWatcher;
+    public Action AnchorUpdated;
+
 
     private readonly Queue<Action> dispatchQueue = new Queue<Action>();
 
@@ -34,12 +54,76 @@ public class AnchorModuleScript : MonoBehaviour
     void Start()
     {
         // Get a reference to the SpatialAnchorManager component (must be on the same gameobject)
-        cloudManager = GetComponent<SpatialAnchorManager>();
+        //cloudManager = GetComponent<SpatialAnchorManager>();
 
         // Register for Azure Spatial Anchor events
-        cloudManager.AnchorLocated += CloudManager_AnchorLocated;
+    }
 
+    public void Setup()
+    {
+        childObjects = new Dictionary<string, PlacedObjects>();
+
+#if !UNITY_EDITOR
+        cloudManager.AnchorLocated += CloudManager_AnchorLocated;
         anchorLocateCriteria = new AnchorLocateCriteria();
+#endif
+
+    }
+
+    public void UpdateObject(PlaceableObject placeableObject)
+    {
+        childObjects[placeableObject.id].position = placeableObject.transform.position.ToString();
+        childObjects[placeableObject.id].rotation = placeableObject.transform.rotation.eulerAngles.ToString();
+        if (String.IsNullOrEmpty(placeableObject.information))
+        {
+            childObjects[placeableObject.id].information = "Untitled";
+        }
+        else
+        {
+            childObjects[placeableObject.id].information = placeableObject.information;
+        }
+        if(currentAzureAnchorID == "")
+        {
+            Debug.Log($"{ currentAzureAnchorID} is a generated anchorID for reasons");
+            Guid guid = Guid.NewGuid();
+
+            currentAzureAnchorID = guid.ToString();
+           
+        }
+        placeableObjectManager.UpdateAnchor(currentAzureAnchorID, this);
+    }
+
+    public void SpawnChildObjects(List<PlacedObjects> childrenToSpawn, GameObject prefabTemplate, string cloudAnchorID)
+    {
+        foreach (var item in childrenToSpawn)
+        {
+            GameObject go = Instantiate(prefabTemplate, StringToVector3(item.position), Quaternion.Euler(StringToVector3(item.rotation)),this.transform);
+            go.GetComponent<PlaceableObject>().associatedCloudAnchor = cloudAnchorID;
+            go.GetComponent<PlaceableObject>().parentCloudAnchor = this;
+            go.GetComponent<PlaceableObject>().id = item.id;
+            if (String.IsNullOrEmpty(item.information))
+            {
+                item.information = "No Info Recorded";
+                go.GetComponent<PlaceableObject>().informationTextField.text = "No Info Recorded";
+            }
+            else
+            {
+                go.GetComponent<PlaceableObject>().information = item.information;
+                go.GetComponent<PlaceableObject>().informationTextField.text = item.information;
+            }
+            this.childObjects.Add(item.id, item);
+        }
+    }
+
+    public void AddNewPlacedObject(GameObject newPlacedObjectGO)
+    {
+        Guid guid = Guid.NewGuid();
+        PlacedObjects newPlacedObject = new PlacedObjects();
+        newPlacedObject.id = guid.ToString();
+        newPlacedObjectGO.GetComponent<PlaceableObject>().id = guid.ToString();
+        newPlacedObject.position = newPlacedObjectGO.transform.position.ToString();
+        newPlacedObject.rotation = newPlacedObjectGO.transform.rotation.eulerAngles.ToString();
+        childObjects.Add(newPlacedObject.id, newPlacedObject);
     }
 
     void Update()
@@ -55,10 +139,10 @@ public class AnchorModuleScript : MonoBehaviour
 
     void OnDestroy()
     {
-        if (cloudManager != null && cloudManager.Session != null)
-        {
-            cloudManager.DestroySession();
-        }
+        //if (cloudManager != null && cloudManager.Session != null)
+        //{
+        //    cloudManager.DestroySession();
+        //}
 
         if (currentWatcher != null)
         {
@@ -68,44 +152,24 @@ public class AnchorModuleScript : MonoBehaviour
     }
     #endregion
 
-    #region Public Methods
-    public async void StartAzureSession()
+    public static Vector3 StringToVector3(string sVector)
     {
-        Debug.Log("\nAnchorModuleScript.StartAzureSession()");
-
-        // Notify AnchorFeedbackScript
-        OnStartASASession?.Invoke();
-
-        Debug.Log("Starting Azure session... please wait...");
-
-        if (cloudManager.Session == null)
+        // Remove the parentheses
+        if (sVector.StartsWith("(") && sVector.EndsWith(")"))
         {
-            // Creates a new session if one does not exist
-            await cloudManager.CreateSessionAsync();
+            sVector = sVector.Substring(1, sVector.Length - 2);
         }
 
-        // Starts the session if not already started
-        await cloudManager.StartSessionAsync();
+        // split the items
+        string[] sArray = sVector.Split(',');
 
-        Debug.Log("Azure session started successfully");
-    }
+        // store as a Vector3
+        Vector3 result = new Vector3(
+            float.Parse(sArray[0]),
+            float.Parse(sArray[1]),
+            float.Parse(sArray[2]));
 
-    public async void StopAzureSession()
-    {
-        Debug.Log("\nAnchorModuleScript.StopAzureSession()");
-
-        // Notify AnchorFeedbackScript
-        OnEndASASession?.Invoke();
-
-        Debug.Log("Stopping Azure session... please wait...");
-
-        // Stops any existing session
-        cloudManager.StopSession();
-
-        // Resets the current session if there is one, and waits for any active queries to be stopped
-        await cloudManager.ResetSessionAsync();
-
-        Debug.Log("Azure session stopped successfully");
+        return result;
     }
 
     public async void CreateAzureAnchor(GameObject theObject)
@@ -328,7 +392,6 @@ public class AnchorModuleScript : MonoBehaviour
 
         StartCoroutine(GetSharedAzureAnchorIDCoroutine(publicSharingPin));
     }
-    #endregion
 
     #region Event Handlers
     private void CloudManager_AnchorLocated(object sender, AnchorLocatedEventArgs args)
